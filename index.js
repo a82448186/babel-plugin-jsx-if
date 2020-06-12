@@ -1,20 +1,18 @@
 // let babel = require("@babel/core");
+let mark = "v";
 
 /**
  * @param {babel} babel
  */
 module.exports = function (babel) {
-    const MARK = "v";
-    const DIRECTIVE_IF = MARK + "-if";
-    const DIRECTIVE_ELSE_IF = MARK + "-else-if";
-    const DIRECTIVE_ELSE = MARK + "-else";
     var t = babel.types;
     return {
         inherits: require("@babel/plugin-syntax-jsx").default,
         visitor: {
-            JSXElement: function (path) {
+            JSXElement: function (path, state) {
+                state.opts.mark && (mark = state.opts.mark);
                 // IF 属性的 path
-                let ifPathMap = getAttrByName(path);
+                let ifPathMap = getAttrByName(t, path);
                 // let attributesPath = path.get("openingElement.attributes");
                 // attributesPath.forEach((attrPath) => {
                 //     if (attrPath.node.name.name === DIRECTIVE_IF) {
@@ -28,15 +26,15 @@ module.exports = function (babel) {
                     return;
                 }
                 // else-if 和 else 必须在 if 之后的元素
-                if (ifPathMap.name === DIRECTIVE_ELSE_IF || ifPathMap.name === DIRECTIVE_ELSE) {
+                if (ifPathMap.name === getElseIfName() || ifPathMap.name === getElseName()) {
                     throw path.buildCodeFrameError(
-                        "you can not use " + ifPathMap.name + " without a " + DIRECTIVE_IF + " JSXElement"
+                        "you can not use " + ifPathMap.name + " without a " + getIfName() + " JSXElement"
                     );
                 }
                 // if 后必须跟表达式  例如 xx-if={} 不能使用 xx-if=""
                 if (t.isStringLiteral(ifPath.node.value)) {
                     throw path.buildCodeFrameError(
-                        "you can not use " + DIRECTIVE_IF + " with a value of string, please use an expression"
+                        "you can not use " + getIfName() + " with a value of string, please use an expression"
                     );
                 }
                 // 条件表达式 xx?x:y
@@ -52,7 +50,7 @@ module.exports = function (babel) {
                     path.replaceWith(t.jsxExpressionContainer(logicalExpression));
                 } else {
                     throw path.buildCodeFrameError(
-                        "you can not use " + DIRECTIVE_IF + " in a child of " + path.parentPath.type
+                        "you can not use " + getIfName() + " in a child of " + path.parentPath.type
                     );
                 }
                 // 删除该属性
@@ -64,10 +62,11 @@ module.exports = function (babel) {
 
 /**
  * 根据属性名  获取属性的path
+ * @param {babel.types} t
  * @param {*} path JSXElement path
  * @returns {{name: string, attrPath:*}}
  */
-function getAttrByName(path) {
+function getAttrByName(t, path) {
     let ifPath = {
         name: "",
         attrPath: null,
@@ -77,7 +76,10 @@ function getAttrByName(path) {
         return ifPath;
     }
     attributesPath.forEach((attrPath) => {
-        if (~[DIRECTIVE_IF, DIRECTIVE_ELSE_IF, DIRECTIVE_ELSE].indexOf(attrPath.node.name.name)) {
+        if(t.isJSXSpreadAttribute(attrPath.node)) {
+            return
+        }
+        if (~[getIfName(), getElseName(), getElseIfName()].indexOf(attrPath.node.name.name)) {
             if (ifPath.name) {
                 throw path.buildCodeFrameError(
                     "you can not use " + attrPath.node.name.name + " and " + ifPath.name + " in the same JSXElement"
@@ -114,12 +116,12 @@ function getElseExpression(t, prePath, flag = false) {
             return t.nullLiteral();
         }
     }
-    let ifPathMap = getAttrByName(nextPath);
+    let ifPathMap = getAttrByName(t, nextPath);
     let ifPath = ifPathMap.attrPath;
     // 没有else 块
-    if (!ifPathMap.name || ifPathMap.name === DIRECTIVE_IF) {
+    if (!ifPathMap.name || ifPathMap.name === getIfName()) {
         return t.nullLiteral();
-    } else if (ifPathMap.name === DIRECTIVE_ELSE) {
+    } else if (ifPathMap.name === getElseName()) {
         // else 之后不能跟表达式
         if (ifPath.node.value !== null) {
             throw nextPath.buildCodeFrameError(
@@ -164,4 +166,16 @@ function isTextEmpty(t, JSXTextPath) {
         JSXTextPath.replaceWith(t.jsxText(JSXTextValue));
     }
     return !JSXTextValue;
+}
+
+function getIfName() {
+    return mark + "-if";
+}
+
+function getElseIfName() {
+    return mark + "-else-if";
+}
+
+function getElseName() {
+    return mark + "-else";
 }
