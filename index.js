@@ -1,13 +1,13 @@
 // let babel = require("@babel/core");
-const SIGN = "v";
-const DIRECTIVE_IF = SIGN + "-if";
-const DIRECTIVE_ELSE_IF = SIGN + "-else-if";
-const DIRECTIVE_ELSE = SIGN + "-else";
 
 /**
  * @param {babel} babel
  */
 module.exports = function (babel) {
+    const MARK = "v";
+    const DIRECTIVE_IF = MARK + "-if";
+    const DIRECTIVE_ELSE_IF = MARK + "-else-if";
+    const DIRECTIVE_ELSE = MARK + "-else";
     var t = babel.types;
     return {
         inherits: require("@babel/plugin-syntax-jsx").default,
@@ -120,7 +120,7 @@ function getElseExpression(t, prePath, flag = false) {
     if (!ifPathMap.name || ifPathMap.name === DIRECTIVE_IF) {
         return t.nullLiteral();
     } else if (ifPathMap.name === DIRECTIVE_ELSE) {
-        // else 之后不能跟表达式 
+        // else 之后不能跟表达式
         if (ifPath.node.value !== null) {
             throw nextPath.buildCodeFrameError(
                 "you can not set a string or expression to the attribute" + ifPathMap.name
